@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <meta name="description" content="WayToAGI管理员登录后台，管理Credits充值申请工单">
+  <meta name="keywords" content="WayToAGI,管理员登录,后台管理,Credits充值">
+  <meta name="author" content="WayToAGI">
+  <meta name="robots" content="noindex, nofollow">
+  
+  <meta property="og:title" content="管理员登录 - WayToAGI">
+  <meta property="og:description" content="WayToAGI管理员登录后台">
+  <meta property="og:type" content="website">
+  
+  <title>管理员登录 | WayToAGI 管理后台</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo">
+        <div class="logo-icon">
+          <i data-lucide="coins" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h1>Credits 充值申请</h1>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">
+          <i data-lucide="arrow-left" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>
+          返回首页
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container container-narrow">
+    <div class="hero">
+      <h2>管理员登录</h2>
+      <p>登录管理后台处理 Credits 充值申请</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon primary">
+          <i data-lucide="lock" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h3 class="card-title">登录</h3>
+      </div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label class="form-label" for="username">用户名</label>
+          <input type="text" id="username" class="form-input" placeholder="admin">
+          <p class="form-error" id="usernameError">请输入用户名</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">密码</label>
+          <input type="password" id="password" class="form-input" placeholder="admin123">
+          <p class="form-error" id="passwordError">请输入密码</p>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-full" id="loginBtn">
+          <i data-lucide="log-in" style="width: 18px; height: 18px;"></i>
+          登录
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const ADMIN_USERNAME = 'admin';
+    const ADMIN_PASSWORD = 'admin123';
+    const LOGIN_KEY = 'admin_logged_in';
+
+    const loginForm = document.getElementById('loginForm');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const loginBtn = document.getElementById('loginBtn');
+    const toastContainer = document.getElementById('toastContainer');
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <div class="toast-icon">
+          <i data-lucide="${type === 'success' ? 'check' : 'x'}" style="width: 16px; height: 16px;"></i>
+        </div>
+        <span class="toast-message">${message}</span>
+      `;
+      toastContainer.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function clearErrors() {
+      document.querySelectorAll('.form-error').forEach(el => el.classList.remove('show'));
+      document.querySelectorAll('.form-input').forEach(el => el.classList.remove('error'));
+    }
+
+    function showError(inputId, errorId) {
+      document.getElementById(inputId).classList.add('error');
+      document.getElementById(errorId).classList.add('show');
+    }
+
+    function validateForm() {
+      clearErrors();
+      let isValid = true;
+
+      if (!usernameInput.value.trim()) {
+        showError('username', 'usernameError');
+        isValid = false;
+      }
+
+      if (!passwordInput.value.trim()) {
+        showError('password', 'passwordError');
+        isValid = false;
+      }
+
+      return isValid;
+    }
+
+    loginForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      if (!validateForm()) {
+        return;
+      }
+
+      if (usernameInput.value.trim() === ADMIN_USERNAME && passwordInput.value === ADMIN_PASSWORD) {
+        localStorage.setItem(LOGIN_KEY, 'true');
+        showToast('登录成功');
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<i data-lucide="loader-2" class="loading" style="width: 18px; height: 18px;"></i> 正在跳转...';
+        lucide.createIcons();
+        setTimeout(() => {
+          window.location.href = 'admin.html';
+        }, 800);
+      } else {
+        showError('username', 'usernameError');
+        showError('password', 'passwordError');
+        showToast('用户名或密码错误', 'error');
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+
+      if (localStorage.getItem(LOGIN_KEY) === 'true') {
+        window.location.href = 'admin.html';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <meta name="description" content="WayToAGI社区AICoding课程Credits充值申请平台，为学员提供便捷的Enter·pro Credits充值服务">
+  <meta name="keywords" content="WayToAGI,AICoding,Credits,充值申请,Enter·pro,AI课程,编程培训">
+  <meta name="author" content="WayToAGI">
+  <meta name="robots" content="index, follow">
+  
+  <meta property="og:title" content="Credits 充值申请 - WayToAGI">
+  <meta property="og:description" content="WayToAGI社区AICoding课程Credits充值申请平台">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.waytoagi.com/credits-apply">
+  
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Credits 充值申请 - WayToAGI">
+  <meta name="twitter:description" content="WayToAGI社区AICoding课程Credits充值申请平台">
+  
+  <title>Credits 充值申请 | WayToAGI AICoding课程</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo">
+        <div class="logo-icon">
+          <i data-lucide="coins" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h1>Credits 充值申请</h1>
+      </div>
+      <div class="nav-links">
+        <a href="login.html" class="nav-link">
+          <i data-lucide="settings" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>
+          管理后台
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container container-narrow">
+    <div class="hero">
+      <h2>AICoding 课程 Credits 充值</h2>
+      <p>填写下方表单提交 Credits 充值申请，或查看您的历史申请记录</p>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon primary">
+          <i data-lucide="plus-circle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h3 class="card-title">充值申请表单</h3>
+      </div>
+
+      <form id="applicationForm">
+        <div class="form-group">
+          <label class="form-label" for="email">Enter·pro 邮箱地址 *</label>
+          <input type="email" id="email" class="form-input" placeholder="yourname@enter.pro" required>
+          <p class="form-error" id="emailError">请输入有效的 enter.pro 邮箱地址</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="studentName">学员名称 *</label>
+          <input type="text" id="studentName" class="form-input" placeholder="最多 20 个字符" maxlength="20" required>
+          <p class="form-error" id="nameError">请输入学员名称</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="course">所学课程 *</label>
+          <select id="course" class="form-select" required>
+            <option value="">请选择课程</option>
+            <option value="AI Coding 入门课程">AI Coding 入门课程</option>
+            <option value="AI Coding 进阶课程">AI Coding 进阶课程</option>
+            <option value="AI Coding 实战项目">AI Coding 实战项目</option>
+            <option value="Enter·pro 全栈课程">Enter·pro 全栈课程</option>
+          </select>
+          <p class="form-error" id="courseError">请选择所学课程</p>
+        </div>
+
+        <div class="btn-group" style="margin-top: 32px;">
+          <button type="button" class="btn btn-secondary" id="resetBtn">
+            <i data-lucide="rotate-ccw" style="width: 18px; height: 18px;"></i>
+            重填
+          </button>
+          <button type="submit" class="btn btn-primary" id="submitBtn">
+            <i data-lucide="send" style="width: 18px; height: 18px;"></i>
+            提交申请
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon success">
+          <i data-lucide="list" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h3 class="card-title">我的申请记录</h3>
+        <button class="btn btn-sm btn-secondary" id="refreshRecordsBtn" style="margin-left: auto;">
+          <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
+          刷新
+        </button>
+      </div>
+
+      <div id="applicationRecords">
+        <div class="empty-state">
+          <i data-lucide="inbox" style="width: 64px; height: 64px;"></i>
+          <h3>加载中...</h3>
+          <p>正在获取申请记录</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://muljxffabqlmgiegmpeu.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_ANuFS8Crxz5rZOXoK6Ssrw_bspW8gCC';
+    
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const form = document.getElementById('applicationForm');
+    const emailInput = document.getElementById('email');
+    const nameInput = document.getElementById('studentName');
+    const courseSelect = document.getElementById('course');
+    const resetBtn = document.getElementById('resetBtn');
+    const submitBtn = document.getElementById('submitBtn');
+    const refreshRecordsBtn = document.getElementById('refreshRecordsBtn');
+    const applicationRecords = document.getElementById('applicationRecords');
+    const toastContainer = document.getElementById('toastContainer');
+
+    async function fetchApplications() {
+      const { data, error } = await supabaseClient
+        .from('applications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching applications:', error);
+        return [];
+      }
+      return data || [];
+    }
+
+    async function createApplication(application) {
+      const { data, error } = await supabaseClient
+        .from('applications')
+        .insert([{
+          student_name: application.studentName,
+          email: application.email,
+          course: application.course,
+          status: 'pending',
+          reject_reason: null
+        }]);
+      
+      if (error) {
+        console.error('Error creating application:', error);
+        return { error: error.message };
+      }
+      return { success: true, data };
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <div class="toast-icon">
+          <i data-lucide="${type === 'success' ? 'check' : 'x'}" style="width: 16px; height: 16px;"></i>
+        </div>
+        <span class="toast-message">${message}</span>
+      `;
+      toastContainer.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function getStatusBadge(status) {
+      const statusMap = {
+        pending: { text: '待处理', class: 'pending' },
+        approved: { text: '充值已到账', class: 'approved' },
+        rejected: { text: '已驳回', class: 'rejected' }
+      };
+      const info = statusMap[status] || statusMap.pending;
+      return `<span class="status-badge ${info.class}">${info.text}</span>`;
+    }
+
+    async function renderApplicationRecords() {
+      const applications = await fetchApplications();
+
+      if (applications.length === 0) {
+        applicationRecords.innerHTML = `
+          <div class="empty-state">
+            <i data-lucide="inbox" style="width: 64px; height: 64px;"></i>
+            <h3>暂无申请记录</h3>
+            <p>提交充值申请后将在此处显示</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      applicationRecords.innerHTML = applications.map(app => {
+        let rejectReasonHtml = '';
+        if (app.status === 'rejected' && app.reject_reason) {
+          rejectReasonHtml = `
+            <div class="reject-reason-box" style="margin-top: 12px; padding: 12px;">
+              <label style="font-size: 0.875rem;"><i data-lucide="info" style="width: 14px; height: 14px; vertical-align: -2px; margin-right: 4px;"></i>驳回原因</label>
+              <p style="font-size: 0.875rem;">${escapeHtml(app.reject_reason)}</p>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="ticket-item">
+            <div class="ticket-header">
+              <div class="ticket-info">
+                <h4>${escapeHtml(app.student_name)}</h4>
+                <p>${escapeHtml(app.email)} · ${escapeHtml(app.course)}</p>
+              </div>
+              ${getStatusBadge(app.status)}
+            </div>
+            ${rejectReasonHtml}
+            <div class="ticket-date">工单 #${app.id.slice(-8)} · 提交于 ${formatDate(app.created_at)}</div>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    function validateEmail(email) {
+      const regex = /^[^\s@]+@enter\.pro$/i;
+      return regex.test(email.trim());
+    }
+
+    function clearErrors() {
+      document.querySelectorAll('.form-error').forEach(el => el.classList.remove('show'));
+      document.querySelectorAll('.form-input, .form-select').forEach(el => el.classList.remove('error'));
+    }
+
+    function showError(inputId, errorId) {
+      document.getElementById(inputId).classList.add('error');
+      document.getElementById(errorId).classList.add('show');
+    }
+
+    function validateForm() {
+      clearErrors();
+      let isValid = true;
+
+      if (!emailInput.value.trim() || !validateEmail(emailInput.value)) {
+        showError('email', 'emailError');
+        isValid = false;
+      }
+
+      if (!nameInput.value.trim()) {
+        showError('studentName', 'nameError');
+        isValid = false;
+      }
+
+      if (!courseSelect.value) {
+        showError('course', 'courseError');
+        isValid = false;
+      }
+
+      return isValid;
+    }
+
+    function updateSubmitButton() {
+      const hasEmail = emailInput.value.trim() && validateEmail(emailInput.value);
+      const hasName = nameInput.value.trim();
+      const hasCourse = courseSelect.value;
+      submitBtn.disabled = !(hasEmail && hasName && hasCourse);
+    }
+
+    emailInput.addEventListener('input', updateSubmitButton);
+    nameInput.addEventListener('input', updateSubmitButton);
+    courseSelect.addEventListener('change', updateSubmitButton);
+
+    resetBtn.addEventListener('click', () => {
+      form.reset();
+      clearErrors();
+      updateSubmitButton();
+    });
+
+    refreshRecordsBtn.addEventListener('click', async () => {
+      refreshRecordsBtn.innerHTML = '<i data-lucide="loader-2" class="loading" style="width: 16px; height: 16px;"></i>';
+      refreshRecordsBtn.disabled = true;
+      lucide.createIcons();
+
+      await renderApplicationRecords();
+      
+      refreshRecordsBtn.innerHTML = '<i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i> 刷新';
+      refreshRecordsBtn.disabled = false;
+      lucide.createIcons();
+      showToast('已刷新');
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!validateForm()) {
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i data-lucide="loader-2" class="loading" style="width: 18px; height: 18px;"></i> 提交中...';
+      lucide.createIcons();
+
+      const result = await createApplication({
+        email: emailInput.value.trim(),
+        studentName: nameInput.value.trim(),
+        course: courseSelect.value
+      });
+
+      if (result && !result.error) {
+        form.reset();
+        updateSubmitButton();
+        await renderApplicationRecords();
+        showToast('申请提交成功！');
+      } else {
+        const errorMsg = result && result.error ? result.error : '提交失败，请重试';
+        showToast(errorMsg, 'error');
+      }
+
+      submitBtn.innerHTML = '<i data-lucide="send" style="width: 18px; height: 18px;"></i> 提交申请';
+      submitBtn.disabled = false;
+      lucide.createIcons();
+    });
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      updateSubmitButton();
+      await renderApplicationRecords();
+    });
+  </script>
+</body>
+</html>

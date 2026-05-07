@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <meta name="description" content="WayToAGI Credits充值申请管理后台，审核和处理学员充值工单">
+  <meta name="keywords" content="WayToAGI,管理后台,Credits充值,工单管理,审核系统">
+  <meta name="author" content="WayToAGI">
+  <meta name="robots" content="noindex, nofollow">
+  
+  <meta property="og:title" content="管理后台 - WayToAGI">
+  <meta property="og:description" content="WayToAGI Credits充值申请管理后台">
+  <meta property="og:type" content="website">
+  
+  <title>管理后台 | Credits 充值申请 - WayToAGI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo">
+        <div class="logo-icon">
+          <i data-lucide="coins" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h1>管理后台</h1>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">
+          <i data-lucide="arrow-left" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>
+          返回首页
+        </a>
+        <a href="#" class="nav-link" id="logoutBtn">
+          <i data-lucide="log-out" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>
+          退出登录
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="hero">
+      <h2>充值申请管理</h2>
+      <p>查看和处理所有学员提交的 Credits 充值申请</p>
+    </div>
+
+    <div class="grid grid-3" style="margin-bottom: 32px;">
+      <div class="card stat-card">
+        <div class="card-icon warning">
+          <i data-lucide="clock" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="stat-number warning" id="pendingCount">0</div>
+        <div class="stat-label">待处理</div>
+      </div>
+      <div class="card stat-card">
+        <div class="card-icon success">
+          <i data-lucide="check-circle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="stat-number success" id="approvedCount">0</div>
+        <div class="stat-label">已通过</div>
+      </div>
+      <div class="card stat-card">
+        <div class="card-icon danger">
+          <i data-lucide="x-circle" style="width: 24px; height: 24px;"></i>
+        </div>
+        <div class="stat-number danger" id="rejectedCount">0</div>
+        <div class="stat-label">已驳回</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-icon primary">
+          <i data-lucide="list" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h3 class="card-title">申请工单列表</h3>
+      </div>
+
+      <div class="top-actions">
+        <button class="btn btn-secondary" id="refreshBtn">
+          <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
+          刷新
+        </button>
+      </div>
+
+      <div id="ticketList">
+        <div class="empty-state">
+          <i data-lucide="loader-2" class="loading" style="width: 64px; height: 64px;"></i>
+          <h3>加载中...</h3>
+          <p>正在获取工单数据</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 详情模态框 -->
+  <div class="modal-overlay" id="detailModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>工单详情</h3>
+        <button class="modal-close" id="closeModalBtn">
+          <i data-lucide="x" style="width: 20px; height: 20px;"></i>
+        </button>
+      </div>
+      <div id="modalContent">
+        <!-- 内容由 JS 动态渲染 -->
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://muljxffabqlmgiegmpeu.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_ANuFS8Crxz5rZOXoK6Ssrw_bspW8gCC';
+    const LOGIN_KEY = 'admin_logged_in';
+    
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const pendingCount = document.getElementById('pendingCount');
+    const approvedCount = document.getElementById('approvedCount');
+    const rejectedCount = document.getElementById('rejectedCount');
+    const ticketList = document.getElementById('ticketList');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const detailModal = document.getElementById('detailModal');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const modalContent = document.getElementById('modalContent');
+    const toastContainer = document.getElementById('toastContainer');
+
+    let currentTicketId = null;
+
+    async function fetchApplications() {
+      const { data, error } = await supabaseClient
+        .from('applications')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching applications:', error);
+        return [];
+      }
+      return data || [];
+    }
+
+    async function updateApplication(id, updates) {
+      const { error } = await supabaseClient
+        .from('applications')
+        .update(updates)
+        .eq('id', id);
+      
+      if (error) {
+        console.error('Error updating application:', error);
+        return null;
+      }
+      return { success: true };
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <div class="toast-icon">
+          <i data-lucide="${type === 'success' ? 'check' : 'x'}" style="width: 16px; height: 16px;"></i>
+        </div>
+        <span class="toast-message">${message}</span>
+      `;
+      toastContainer.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function updateStats() {
+      const applications = await fetchApplications();
+      pendingCount.textContent = applications.filter(app => app.status === 'pending').length;
+      approvedCount.textContent = applications.filter(app => app.status === 'approved').length;
+      rejectedCount.textContent = applications.filter(app => app.status === 'rejected').length;
+    }
+
+    async function renderTickets() {
+      const applications = await fetchApplications();
+
+      if (applications.length === 0) {
+        ticketList.innerHTML = `
+          <div class="empty-state">
+            <i data-lucide="inbox" style="width: 64px; height: 64px;"></i>
+            <h3>暂无申请记录</h3>
+            <p>学员提交充值申请后将显示在此处</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      ticketList.innerHTML = applications.map(app => `
+        <div class="ticket-item" data-id="${app.id}">
+          <div class="ticket-header">
+            <div class="ticket-info">
+              <h4>${escapeHtml(app.student_name)}</h4>
+              <p>${escapeHtml(app.email)} · ${escapeHtml(app.course)}</p>
+            </div>
+            <span class="status-badge ${app.status}">${
+              app.status === 'pending' ? '待处理' :
+              app.status === 'approved' ? '已通过' : '已驳回'
+            }</span>
+          </div>
+          <div class="ticket-date">工单 #${app.id.slice(-8)} · 提交于 ${formatDate(app.created_at)}</div>
+        </div>
+      `).join('');
+
+      lucide.createIcons();
+
+      document.querySelectorAll('.ticket-item').forEach(item => {
+        item.addEventListener('click', () => {
+          openModal(item.dataset.id);
+        });
+      });
+    }
+
+    async function openModal(id) {
+      const applications = await fetchApplications();
+      const application = applications.find(app => app.id === id);
+      if (!application) return;
+
+      currentTicketId = id;
+
+      let actionButtonsHtml = '';
+      if (application.status === 'pending') {
+        actionButtonsHtml = `
+          <div class="modal-footer">
+            <button class="btn btn-danger" id="rejectBtn">
+              <i data-lucide="x" style="width: 18px; height: 18px;"></i>
+              驳回申请
+            </button>
+            <button class="btn btn-success" id="approveBtn">
+              <i data-lucide="check" style="width: 18px; height: 18px;"></i>
+              通过申请
+            </button>
+          </div>
+        `;
+      }
+
+      let rejectReasonHtml = '';
+      if (application.status === 'rejected' && application.reject_reason) {
+        rejectReasonHtml = `
+          <div class="reject-reason-box">
+            <label><i data-lucide="info" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>驳回原因</label>
+            <p>${escapeHtml(application.reject_reason)}</p>
+          </div>
+        `;
+      }
+
+      modalContent.innerHTML = `
+        <div class="detail-row">
+          <span class="detail-label">工单编号</span>
+          <span class="detail-value">#${application.id.slice(-8)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">邮箱地址</span>
+          <span class="detail-value">${escapeHtml(application.email)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">学员名称</span>
+          <span class="detail-value">${escapeHtml(application.student_name)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">所学课程</span>
+          <span class="detail-value">${escapeHtml(application.course)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">申请时间</span>
+          <span class="detail-value">${formatDate(application.created_at)}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">申请状态</span>
+          <span class="status-badge ${application.status}">${
+            application.status === 'pending' ? '待处理' :
+            application.status === 'approved' ? '已通过' : '已驳回'
+          }</span>
+        </div>
+        ${rejectReasonHtml}
+        ${actionButtonsHtml}
+      `;
+
+      detailModal.classList.add('show');
+      lucide.createIcons();
+
+      const approveBtn = document.getElementById('approveBtn');
+      const rejectBtn = document.getElementById('rejectBtn');
+
+      if (approveBtn) {
+        approveBtn.addEventListener('click', approveApplication);
+      }
+      if (rejectBtn) {
+        rejectBtn.addEventListener('click', showRejectInput);
+      }
+    }
+
+    function closeModal() {
+      detailModal.classList.remove('show');
+      currentTicketId = null;
+    }
+
+    async function approveApplication() {
+      if (!currentTicketId) return;
+
+      const result = await updateApplication(currentTicketId, { status: 'approved' });
+
+      if (result) {
+        closeModal();
+        await renderTickets();
+        await updateStats();
+        showToast('已通过该充值申请');
+      } else {
+        showToast('操作失败，请重试', 'error');
+      }
+    }
+
+    function showRejectInput() {
+      const reason = prompt('请输入驳回原因：');
+      if (reason === null) return;
+
+      rejectApplication(reason.trim());
+    }
+
+    async function rejectApplication(reason) {
+      if (!currentTicketId) return;
+
+      const result = await updateApplication(currentTicketId, { 
+        status: 'rejected',
+        reject_reason: reason || '申请未通过'
+      });
+
+      if (result) {
+        closeModal();
+        await renderTickets();
+        await updateStats();
+        showToast('已驳回该充值申请');
+      } else {
+        showToast('操作失败，请重试', 'error');
+      }
+    }
+
+    refreshBtn.addEventListener('click', async () => {
+      refreshBtn.innerHTML = '<i data-lucide="loader-2" class="loading" style="width: 18px; height: 18px;"></i> 刷新中...';
+      refreshBtn.disabled = true;
+      lucide.createIcons();
+
+      await renderTickets();
+      await updateStats();
+      
+      refreshBtn.innerHTML = '<i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> 刷新';
+      refreshBtn.disabled = false;
+      lucide.createIcons();
+      showToast('已刷新');
+    });
+
+    logoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.removeItem(LOGIN_KEY);
+      showToast('已退出登录');
+      setTimeout(() => {
+        window.location.href = 'login.html';
+      }, 800);
+    });
+
+    closeModalBtn.addEventListener('click', closeModal);
+
+    detailModal.addEventListener('click', (e) => {
+      if (e.target === detailModal) {
+        closeModal();
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+
+      if (localStorage.getItem(LOGIN_KEY) !== 'true') {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      await updateStats();
+      await renderTickets();
+    });
+  </script>
+</body>
+</html>

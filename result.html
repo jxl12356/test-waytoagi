@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <meta name="description" content="WayToAGI Credits充值申请结果查询，查看您的充值申请状态">
+  <meta name="keywords" content="WayToAGI,Credits,充值申请,申请结果,状态查询">
+  <meta name="author" content="WayToAGI">
+  <meta name="robots" content="noindex, follow">
+  
+  <meta property="og:title" content="申请结果 - Credits 充值申请">
+  <meta property="og:description" content="WayToAGI Credits充值申请结果查询">
+  <meta property="og:type" content="website">
+  
+  <title>申请结果 | Credits 充值申请 - WayToAGI</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="navbar-content">
+      <div class="logo">
+        <div class="logo-icon">
+          <i data-lucide="coins" style="width: 24px; height: 24px;"></i>
+        </div>
+        <h1>Credits 充值申请</h1>
+      </div>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link">
+          <i data-lucide="arrow-left" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>
+          返回首页
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container container-narrow">
+    <div class="card" id="resultCard">
+      <div class="empty-state">
+        <i data-lucide="loader-2" class="loading" style="width: 64px; height: 64px;"></i>
+        <h3>加载中...</h3>
+        <p>正在获取申请信息</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const SUPABASE_URL = 'https://muljxffabqlmgiegmpeu.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_ANuFS8Crxz5rZOXoK6Ssrw_bspW8gCC';
+    
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const resultCard = document.getElementById('resultCard');
+    const toastContainer = document.getElementById('toastContainer');
+
+    function getUrlParameter(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    async function fetchApplication(id) {
+      const { data, error } = await supabaseClient
+        .from('applications')
+        .select('*')
+        .eq('id', id)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching application:', error);
+        return null;
+      }
+      return data;
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.innerHTML = `
+        <div class="toast-icon">
+          <i data-lucide="${type === 'success' ? 'check' : 'x'}" style="width: 16px; height: 16px;"></i>
+        </div>
+        <span class="toast-message">${message}</span>
+      `;
+      toastContainer.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.add('removing');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function formatDate(dateString) {
+      const date = new Date(dateString);
+      return date.toLocaleString('zh-CN', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function getStatusInfo(status) {
+      const info = {
+        pending: {
+          icon: 'clock',
+          title: '申请已提交，等待处理',
+          desc: '您的充值申请已成功提交，管理员正在审核中，请耐心等待。'
+        },
+        approved: {
+          icon: 'check-circle',
+          title: '充值已到账！',
+          desc: '恭喜！您的 Credits 充值申请已通过，Credits 已成功到账。'
+        },
+        rejected: {
+          icon: 'x-circle',
+          title: '申请未通过',
+          desc: '很抱歉，您的充值申请未通过，请查看驳回原因或重新提交申请。'
+        }
+      };
+      return info[status] || info.pending;
+    }
+
+    async function renderResult(application) {
+      const statusInfo = getStatusInfo(application.status);
+      let rejectReasonHtml = '';
+
+      if (application.status === 'rejected' && application.reject_reason) {
+        rejectReasonHtml = `
+          <div class="reject-reason-box">
+            <label><i data-lucide="info" style="width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px;"></i>驳回原因</label>
+            <p>${escapeHtml(application.reject_reason)}</p>
+          </div>
+        `;
+      }
+
+      resultCard.innerHTML = `
+        <div class="result-icon ${application.status}">
+          <i data-lucide="${statusInfo.icon}" style="width: 48px; height: 48px;"></i>
+        </div>
+        <h2 class="result-title">${statusInfo.title}</h2>
+        <p class="result-desc">${statusInfo.desc}</p>
+
+        <div style="border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+          <div class="detail-row">
+            <span class="detail-label">工单编号</span>
+            <span class="detail-value">#${application.id.slice(-8)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">邮箱地址</span>
+            <span class="detail-value">${escapeHtml(application.email)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">学员名称</span>
+            <span class="detail-value">${escapeHtml(application.student_name)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">所学课程</span>
+            <span class="detail-value">${escapeHtml(application.course)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">申请时间</span>
+            <span class="detail-value">${formatDate(application.created_at)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">申请状态</span>
+            <span class="status-badge ${application.status}">${
+              application.status === 'pending' ? '待处理' :
+              application.status === 'approved' ? '已通过' : '已驳回'
+            }</span>
+          </div>
+        </div>
+
+        ${rejectReasonHtml}
+
+        <div class="btn-group">
+          <a href="index.html" class="btn btn-secondary">
+            <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i>
+            再次提交
+          </a>
+          <button class="btn btn-primary" id="refreshBtn">
+            <i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i>
+            刷新状态
+          </button>
+        </div>
+      `;
+
+      lucide.createIcons();
+
+      document.getElementById('refreshBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('refreshBtn');
+        btn.innerHTML = '<i data-lucide="loader-2" class="loading" style="width: 18px; height: 18px;"></i> 刷新中...';
+        btn.disabled = true;
+        lucide.createIcons();
+
+        await loadApplication();
+        showToast('状态已刷新');
+        
+        btn.innerHTML = '<i data-lucide="refresh-cw" style="width: 18px; height: 18px;"></i> 刷新状态';
+        btn.disabled = false;
+        lucide.createIcons();
+      });
+    }
+
+    function renderNotFound() {
+      resultCard.innerHTML = `
+        <div class="empty-state">
+          <i data-lucide="search" style="width: 64px; height: 64px;"></i>
+          <h3>申请记录未找到</h3>
+          <p>可能是链接错误或记录已被删除，请重新提交申请</p>
+          <a href="index.html" class="btn btn-primary" style="margin-top: 16px;">
+            <i data-lucide="plus-circle" style="width: 18px; height: 18px;"></i>
+            去提交申请
+          </a>
+        </div>
+      `;
+      lucide.createIcons();
+    }
+
+    async function loadApplication() {
+      const id = getUrlParameter('id');
+      if (!id) {
+        renderNotFound();
+        return;
+      }
+
+      const application = await fetchApplication(id);
+
+      if (!application) {
+        renderNotFound();
+        return;
+      }
+
+      renderResult(application);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      lucide.createIcons();
+      await loadApplication();
+    });
+  </script>
+</body>
+</html>
